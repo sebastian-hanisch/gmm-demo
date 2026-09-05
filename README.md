@@ -1,5 +1,7 @@
 # Gaussian Mixture Models für weiche Sammel-Routen-Zuordnung – Streamlit-Demo
 
+**[→ Demo live ausprobieren](https://sebastianhanisch-gmm-demo.streamlit.app/)**
+
 Sechstes Stück der "Konzepte"-Reihe für die Website "Sebastian Hanisch – Operations
 Research und Machine Learning", **zweiter, unabhängiger Zweig** direkt ab
 [kmeans-demo](../kmeans-demo) - kein dritter Vorläufer zu HDBSCAN. Die Clustering-Linie ist
