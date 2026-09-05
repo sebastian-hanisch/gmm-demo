@@ -264,7 +264,7 @@ Zufall) für alle vier Kovarianz-Typen, jeweils bei Konvergenz:
 )
 
 scores = _compute_covariance_comparison(instance)
-st.plotly_chart(build_rand_index_bar_chart(scores), width="stretch")
+st.plotly_chart(build_rand_index_bar_chart(scores), width="stretch", key="rand_index_bar")
 
 gap = max(scores.values()) - min(scores.values())
 if gap > 0.2:
