@@ -11,7 +11,7 @@ damit ein DAG mit einem Zusammenfluss UND einem zweiten, eigenständigen Ast:
 kmeans-demo → dbscan-demo ──┐
                              ├──> hdbscan-demo
               agglomerative-demo ──────────┘
-kmeans-demo → gmm-demo
+kmeans-demo → gmm-demo → dpmm-demo
 ```
 
 [dbscan-demo](../dbscan-demo) und [agglomerative-demo](../agglomerative-demo) beheben
@@ -23,7 +23,9 @@ Mixture Models (GMM)** ersetzen das Zentrum durch eine volle Gauß-Verteilung (M
 **und** Kovarianzmatrix) je Cluster und die harte Zuweisung durch eine **weiche**
 (wahrscheinlichkeitsbasierte) Zugehörigkeit, berechnet mit dem **EM-Algorithmus**. k-Means
 ist der Grenzfall: gleiche, gegen 0 gehende, kugelförmige Varianz plus harte Zuweisung
-("Hard EM").
+("Hard EM"). Diese Demo benennt im Mathe-Abschnitt offen ihre eigene verbleibende
+Schwäche - k muss weiterhin vorab feststehen -, die [dpmm-demo](../dpmm-demo) über ein
+Dirichlet-Process-Mixture-Modell (Bayesianische Nichtparametrik statt EM) behebt.
 
 ## Warum diese Demo anders aufgebaut ist
 
