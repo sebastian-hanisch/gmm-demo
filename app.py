@@ -184,11 +184,15 @@ st.markdown("## 🎯 EM-Algorithmus in Aktion")
 
 step_col, play_col = st.columns([5, 1])
 with step_col:
-    step = st.slider(
-        "Schritt (Iteration)", 0, max_step, key="gm_step",
-        help="Schritt 0 = E-Schritt auf den Startparametern, danach je ein vollständiger "
-        "M-dann-E-Zyklus.",
-    )
+    if max_step == 0:
+        step = 0
+        st.caption("Bereits im Startzustand konvergiert - kein Regler nötig.")
+    else:
+        step = st.slider(
+            "Schritt (Iteration)", 0, max_step, key="gm_step",
+            help="Schritt 0 = E-Schritt auf den Startparametern, danach je ein vollständiger "
+            "M-dann-E-Zyklus.",
+        )
 with play_col:
     auto_play = st.button("▶️ Abspielen", width="stretch")
 
