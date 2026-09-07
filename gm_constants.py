@@ -6,6 +6,7 @@ DEFAULT_SPREAD = 0.35
 DEFAULT_ELONGATION = 0.0
 DEFAULT_VARIANCE_IMBALANCE = 0.0
 DEFAULT_SEED = 7
+DEFAULT_SHAPE = "blobs"
 DEFAULT_COVARIANCE_TYPE = "full"
 
 N_POINTS_MIN, N_POINTS_MAX = 30, 400
@@ -13,6 +14,9 @@ K_MIN, K_MAX = 2, 6
 SPREAD_MIN, SPREAD_MAX = 0.1, 0.9
 ELONGATION_MIN, ELONGATION_MAX = 0.0, 1.0
 VARIANCE_IMBALANCE_MIN, VARIANCE_IMBALANCE_MAX = 0.0, 1.0
+
+SHAPES = ("blobs", "moons")
+SHAPE_LABELS = {"blobs": "Gruppen (Blobs)", "moons": "Halbmonde"}
 
 # Hard safety limits so a bad slider combination can never hang the app.
 MAX_ITERATIONS = 100
@@ -37,18 +41,22 @@ COVARIANCE_TYPE_LABELS = {
 PRESETS = {
     "Einfaches Beispiel (kreisförmige Gruppen)": {
         "n_points": 90, "k": 3, "spread": 0.25, "elongation": 0.0,
-        "variance_imbalance": 0.0, "seed": 2, "covariance_type": "full",
+        "variance_imbalance": 0.0, "shape": "blobs", "seed": 2, "covariance_type": "full",
     },
     "Schwerer Fall (elliptische, rotierte Gruppen)": {
         "n_points": 200, "k": 3, "spread": 0.25, "elongation": 0.9,
-        "variance_imbalance": 0.0, "seed": 3, "covariance_type": "spherical",
+        "variance_imbalance": 0.0, "shape": "blobs", "seed": 3, "covariance_type": "spherical",
     },
     "Ungleich gestreute Gruppen": {
         "n_points": 200, "k": 3, "spread": 0.25, "elongation": 0.0,
-        "variance_imbalance": 0.9, "seed": 1, "covariance_type": "tied",
+        "variance_imbalance": 0.9, "shape": "blobs", "seed": 1, "covariance_type": "tied",
     },
     "Viele Gruppen": {
         "n_points": 260, "k": 6, "spread": 0.3, "elongation": 0.4,
-        "variance_imbalance": 0.3, "seed": 11, "covariance_type": "full",
+        "variance_imbalance": 0.3, "shape": "blobs", "seed": 11, "covariance_type": "full",
+    },
+    "Nicht-konvexe Formen (GMM scheitert trotz voller Kovarianz)": {
+        "n_points": 150, "k": 2, "spread": 0.1, "elongation": 0.0,
+        "variance_imbalance": 0.0, "shape": "moons", "seed": 2, "covariance_type": "full",
     },
 }

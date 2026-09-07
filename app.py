@@ -40,8 +40,8 @@ st.set_page_config(page_title="Gaussian Mixture Models – Sebastian Hanisch", l
 
 
 @st.cache_data(show_spinner=False)
-def _compute_run(n_points, k, spread, elongation, variance_imbalance, seed, covariance_type):
-    instance = generate_instance(n_points, k, spread, elongation, variance_imbalance, seed)
+def _compute_run(n_points, k, spread, elongation, variance_imbalance, shape, seed, covariance_type):
+    instance = generate_instance(n_points, k, spread, elongation, variance_imbalance, seed, shape=shape)
     result = run(instance.as_array(), k, covariance_type, seed)
     return instance, result
 
@@ -116,6 +116,7 @@ PRESET_HELP = {
     "Schwerer Fall (elliptische, rotierte Gruppen)": "Stark elliptische Gruppen mit unterschiedlicher Rotation - kugelförmige (k-Means-artige) Kovarianz scheitert, volle Kovarianz löst es sauber.",
     "Ungleich gestreute Gruppen": "Eine Gruppe deutlich diffuser als die übrigen - gebundene Kovarianz (eine gemeinsame Form für alle) scheitert hier, weil sie implizit gleiche Varianz erzwingt.",
     "Viele Gruppen": "Mehr Komponenten gleichzeitig - zeigt wachsende Modellkomplexität.",
+    "Nicht-konvexe Formen (GMM scheitert trotz voller Kovarianz)": "Zwei ineinander verschlungene Halbmonde - selbst die flexibelste Kovarianz-Annahme (voll, mit Rotation) ist eine EINZELNE Ellipse je Gruppe und kann eine gebogene Form nicht abbilden. Das behebt erst dbscan-demo/hdbscan-demo/spectral-demo.",
 }
 preset_cols = st.columns(len(C.PRESETS))
 for i, name in enumerate(C.PRESETS.keys()):
@@ -151,6 +152,14 @@ with st.sidebar:
     )
     seed = st.number_input("Zufalls-Seed", *bounds("seed_input"), key="seed_input", step=1)
 
+    st.markdown("**Punktwolken-Form**")
+    shape = st.radio(
+        "Form", options=C.SHAPES, key="shape_radio", format_func=lambda s: C.SHAPE_LABELS[s],
+        help="„Gruppen“: Elongation richtet die lange Achse auf den nächsten Cluster aus. "
+        "„Halbmonde“: nicht-konvexe Bögen - Elongation richtet die lange Achse stattdessen "
+        "an der Bogen-Tangente aus, Varianz-Ungleichgewicht wirkt unverändert.",
+    )
+
     st.markdown("**GMM-Parameter**")
     covariance_type = st.radio(
         "Kovarianz-Annahme (für die Animation unten)",
@@ -167,15 +176,15 @@ with st.sidebar:
         help="Würfelt einen neuen Zufalls-Seed für die Adressstandorte.",
     )
 
-sync_query_params(n_points, k, spread, elongation, variance_imbalance, seed, covariance_type)
+sync_query_params(n_points, k, spread, elongation, variance_imbalance, seed, shape, covariance_type)
 
 with st.spinner("Führe EM-Algorithmus aus..."):
     instance, result = _compute_run(
-        int(n_points), int(k), spread, elongation, variance_imbalance, int(seed), covariance_type
+        int(n_points), int(k), spread, elongation, variance_imbalance, shape, int(seed), covariance_type
     )
 
 max_step = len(result.steps) - 1
-run_key = (n_points, k, spread, elongation, variance_imbalance, seed, covariance_type)
+run_key = (n_points, k, spread, elongation, variance_imbalance, shape, seed, covariance_type)
 if "gm_step" not in st.session_state or st.session_state.get("gm_step_owner") != run_key:
     st.session_state["gm_step"] = max_step
     st.session_state["gm_step_owner"] = run_key

@@ -1,14 +1,19 @@
-"""Zufällige 2D-Punktwolken für die GMM-Demo: k Gauß-Cluster auf einem Ring
-(wie kmeans-demo), aber jeder Cluster bekommt eine EIGENE Kovarianzmatrix statt nur
-einer eigenen Standardabweichung. Zwei unabhängige Schwierigkeitsachsen zusätzlich zu
-`spread` (Basis-Überlappung, wie kmeans-demo):
+"""Zufällige 2D-Punktwolken für die GMM-Demo: k Gauß-Cluster auf einem Ring ("blobs", wie
+kmeans-demo) oder k nicht-konvexe Halbkreis-Bögen ("moons", generalisiert wie in
+dbscan-demo/kmeans-demo) - bei "blobs" bekommt jeder Cluster eine EIGENE Kovarianzmatrix
+statt nur einer Standardabweichung, bei "moons" bekommt jeder PUNKT eine an die lokale
+Bogen-Tangente ausgerichtete Kovarianz (siehe `_generate_moons`). Zwei unabhängige
+Schwierigkeitsachsen zusätzlich zu `spread` (Basis-Überlappung, wie kmeans-demo), bei
+BEIDEN Formen wirksam:
 
-- `elongation`: 0 = kreisförmige Cluster, 1 = stark elliptisch, mit der langen Achse
-  jeweils (leicht verrauscht) auf den nächsten Cluster auf dem Ring ausgerichtet - das ist
-  die Achse, an der k-Means' Annahme kugelförmiger Cluster sichtbar bricht.
-- `variance_imbalance`: 0 = alle Cluster gleich groß gestreut, 1 = Cluster 0 deutlich
+- `elongation`: 0 = kreisförmige Streuung, 1 = stark elliptisch. Bei "blobs" zeigt die
+  lange Achse (leicht verrauscht) auf den nächsten Cluster auf dem Ring - das ist die
+  Achse, an der k-Means' Annahme kugelförmiger Cluster sichtbar bricht. Bei "moons" zeigt
+  die lange Achse ENTLANG der Bogen-Tangente an jedem Punkt - ein schmales bis breites
+  Band statt eines kreisrunden Streubereichs um die ideale Kurve.
+- `variance_imbalance`: 0 = alle Gruppen gleich groß gestreut, 1 = Gruppe 0 deutlich
   diffuser als die übrigen (isotrop, unabhängig von elongation) - die zweite,
-  eigenständige k-Means-Annahme (gleiche Varianz über alle Cluster), die bricht.
+  eigenständige k-Means-Annahme (gleiche Varianz über alle Gruppen), die bricht.
 """
 
 from dataclasses import dataclass
@@ -16,6 +21,8 @@ from dataclasses import dataclass
 import numpy as np
 
 RING_RADIUS = 3.0
+ARC_RADIUS = 2.5
+ARC_RING_RADIUS = 6.5
 MIN_STD_FRACTION = 0.05
 
 
@@ -23,8 +30,11 @@ MIN_STD_FRACTION = 0.05
 class ClusteringInstance:
     points: tuple  # ((x, y), ...), Erzeugungsreihenfolge nach Cluster gruppiert
     true_labels: tuple
-    true_centers: tuple  # ((x, y), ...), k Einträge
-    true_covariances: tuple  # (((a, b), (c, d)), ...), k Einträge, 2x2 Kovarianzmatrizen
+    true_centers: tuple  # ((x, y), ...), k Einträge - bei "moons" der Schwerpunkt je Bogen
+    true_covariances: tuple  # (((a, b), (c, d)), ...), k Einträge, 2x2 Kovarianzmatrizen -
+    # bei "moons" die Kovarianz am Bogen-Mittelpunkt, repräsentativ (variiert dort real
+    # punktweise mit der Tangentenrichtung, siehe `_generate_moons`)
+    shape: str  # "blobs" oder "moons"
     k: int
 
     @property
@@ -59,12 +69,7 @@ def _covariance_matrix(base_std, elongation, angle):
     return rotation @ diag @ rotation.T
 
 
-def generate_instance(n_points, k, spread, elongation, variance_imbalance, seed):
-    """spread steuert die Basis-Überlappung (wie kmeans-demo), elongation und
-    variance_imbalance sind zwei unabhängige zusätzliche Schwierigkeitsachsen (siehe
-    Modul-Docstring)."""
-    rng = np.random.default_rng(seed)
-
+def _generate_blobs(n_points, k, spread, elongation, variance_imbalance, rng):
     angles = np.linspace(0, 2 * np.pi, k, endpoint=False) + rng.uniform(-0.15, 0.15, size=k)
     true_centers = np.stack([RING_RADIUS * np.cos(angles), RING_RADIUS * np.sin(angles)], axis=1)
 
@@ -92,11 +97,107 @@ def generate_instance(n_points, k, spread, elongation, variance_imbalance, seed)
 
     points = np.concatenate(points_per_cluster, axis=0)
     labels = np.concatenate(labels_per_cluster, axis=0)
+    return points, labels, true_centers, covariances
+
+
+def _sample_along_tangent(x, y, tangent_angle, base_std, elongation, rng):
+    """Sampelt Rauschen um (x, y) mit einer an `tangent_angle` ausgerichteten Ellipse
+    (lange Achse ENTLANG der Tangente bei elongation=1, kreisförmig bei elongation=0) -
+    dieselbe major/minor-Konstruktion wie `_covariance_matrix`, aber punktweise und ohne
+    den Umweg über eine explizite Kovarianzmatrix je Punkt."""
+    major = base_std * (1.0 + 2.0 * elongation)
+    minor = base_std * max(1.0 - 0.7 * elongation, MIN_STD_FRACTION)
+    z_major = rng.normal(0.0, major, size=x.shape)
+    z_minor = rng.normal(0.0, minor, size=x.shape)
+    cos_a, sin_a = np.cos(tangent_angle), np.sin(tangent_angle)
+    dx = cos_a * z_major - sin_a * z_minor
+    dy = sin_a * z_major + cos_a * z_minor
+    return np.stack([x + dx, y + dy], axis=1)
+
+
+def _generate_moons(n_points, k, spread, elongation, variance_imbalance, rng):
+    """k=2: das klassische "two moons"-Beispiel (wie in dbscan-demo/kmeans-demo). k>2: k
+    Halbkreis-Bögen wie Blütenblätter auf einem Ring, konkave Seite zum Zentrum.
+    variance_imbalance wirkt wie bei "blobs" (Gruppe 0 diffuser). elongation richtet die
+    lange Achse an der lokalen Bogen-TANGENTE aus statt an einem festen Nachbar-Cluster -
+    bei elongation=1 entsteht ein schmales, lang gezogenes Band statt eines breiten
+    kreisrunden Streubereichs um die ideale Kurve."""
+    counts = np.full(k, n_points // k)
+    counts[: n_points % k] += 1
+    base_stds = _cluster_base_stds(k, spread, variance_imbalance) * 0.3 * (ARC_RADIUS / RING_RADIUS)
+
+    if k == 2:
+        t1 = rng.uniform(0, np.pi, counts[0])
+        x1 = ARC_RADIUS * np.cos(t1)
+        y1 = ARC_RADIUS * np.sin(t1)
+        tangent1 = t1 + np.pi / 2
+
+        t2 = rng.uniform(0, np.pi, counts[1])
+        x2 = ARC_RADIUS * (1 - np.cos(t2))
+        y2 = ARC_RADIUS * (0.5 - np.sin(t2))
+        tangent2 = t2 - np.pi / 2
+
+        pts1 = _sample_along_tangent(x1, y1, tangent1, base_stds[0], elongation, rng)
+        pts2 = _sample_along_tangent(x2, y2, tangent2, base_stds[1], elongation, rng)
+        points = np.concatenate([pts1, pts2], axis=0)
+        labels = np.concatenate([np.zeros(counts[0], dtype=int), np.ones(counts[1], dtype=int)])
+        true_centers = np.stack([points[labels == i].mean(axis=0) for i in range(k)])
+        covariances = np.array([
+            _covariance_matrix(base_stds[i], elongation, [np.pi / 2, -np.pi / 2][i]) for i in range(k)
+        ])
+        return points, labels, true_centers, covariances
+
+    layout_angles = np.linspace(0, 2 * np.pi, k, endpoint=False) + rng.uniform(-0.1, 0.1, size=k)
+    arc_centers = np.stack(
+        [ARC_RING_RADIUS * np.cos(layout_angles), ARC_RING_RADIUS * np.sin(layout_angles)], axis=1
+    )
+
+    points_per_group, labels_per_group = [], []
+    for i in range(k):
+        t = rng.uniform(0, np.pi, counts[i])
+        local_x = ARC_RADIUS * np.cos(t)
+        local_y = ARC_RADIUS * np.sin(t)
+        # Um layout_angle_i + pi rotieren, damit die konkave Seite des Bogens zum
+        # Ringzentrum zeigt (Blütenblatt-Anordnung), statt nach außen - die Tangente
+        # rotiert exakt mit.
+        rot = layout_angles[i] + np.pi
+        cos_r, sin_r = np.cos(rot), np.sin(rot)
+        rx = cos_r * local_x - sin_r * local_y
+        ry = sin_r * local_x + cos_r * local_y
+        tangent = t + np.pi / 2 + rot
+        pts = _sample_along_tangent(rx + arc_centers[i, 0], ry + arc_centers[i, 1], tangent, base_stds[i], elongation, rng)
+        points_per_group.append(pts)
+        labels_per_group.append(np.full(counts[i], i))
+
+    points = np.concatenate(points_per_group, axis=0)
+    labels = np.concatenate(labels_per_group, axis=0)
+    true_centers = np.stack([points[labels == i].mean(axis=0) for i in range(k)])
+    covariances = np.array([
+        _covariance_matrix(base_stds[i], elongation, layout_angles[i] + np.pi + np.pi / 2) for i in range(k)
+    ])
+    return points, labels, true_centers, covariances
+
+
+def generate_instance(n_points, k, spread, elongation, variance_imbalance, seed, shape="blobs"):
+    """spread steuert die Basis-Überlappung (wie kmeans-demo), elongation und
+    variance_imbalance sind zwei unabhängige zusätzliche Schwierigkeitsachsen, bei BEIDEN
+    Formen wirksam (siehe Modul-Docstring)."""
+    rng = np.random.default_rng(seed)
+
+    if shape == "moons":
+        points, labels, true_centers, covariances = _generate_moons(
+            n_points, k, spread, elongation, variance_imbalance, rng
+        )
+    else:
+        points, labels, true_centers, covariances = _generate_blobs(
+            n_points, k, spread, elongation, variance_imbalance, rng
+        )
 
     return ClusteringInstance(
         points=tuple(map(tuple, points.tolist())),
         true_labels=tuple(int(l) for l in labels),
         true_centers=tuple(map(tuple, true_centers.tolist())),
         true_covariances=tuple(tuple(map(tuple, cov.tolist())) for cov in covariances),
+        shape=shape,
         k=k,
     )
