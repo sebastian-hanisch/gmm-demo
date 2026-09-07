@@ -48,7 +48,11 @@ class ClusteringInstance:
 def _cluster_base_stds(k, spread, variance_imbalance):
     """Isotrope Basis-Streuung je Cluster, bevor Elongation angewendet wird. Cluster 0
     wird mit wachsendem variance_imbalance zunehmend diffuser als die übrigen - unabhängig
-    davon, ob die Cluster später auch noch elliptisch verzerrt werden."""
+    davon, ob die Cluster später auch noch elliptisch verzerrt werden. Dieselbe Grund-Idee
+    wie dbscan-demo/hdbscan-demos density_imbalance (Gruppe 0 diffuser bei gleicher
+    Punktzahl), aber mit bewusst aggressiveren Koeffizienten (4.0/0.5 statt deren 1.0/0.6):
+    die Kovarianz-Ellipsen dieser Demo müssen den Unterschied auch bei nur k=2-3 sichtbar
+    ausgeprägten Gruppen klar zeigen, nicht erst bei dbscan-typischen 150+ Punkten."""
     base_std = max(spread, MIN_STD_FRACTION) * RING_RADIUS
     stds = np.full(k, base_std)
     if k > 1:
@@ -86,7 +90,7 @@ def _generate_blobs(n_points, k, spread, elongation, variance_imbalance, rng):
     ])
 
     counts = np.full(k, n_points // k)
-    counts[: n_points % k] += 1
+    counts[-1] += n_points - counts.sum()
 
     points_per_cluster = []
     labels_per_cluster = []
@@ -123,7 +127,7 @@ def _generate_moons(n_points, k, spread, elongation, variance_imbalance, rng):
     bei elongation=1 entsteht ein schmales, lang gezogenes Band statt eines breiten
     kreisrunden Streubereichs um die ideale Kurve."""
     counts = np.full(k, n_points // k)
-    counts[: n_points % k] += 1
+    counts[-1] += n_points - counts.sum()
     base_stds = _cluster_base_stds(k, spread, variance_imbalance) * 0.3 * (ARC_RADIUS / RING_RADIUS)
 
     if k == 2:
